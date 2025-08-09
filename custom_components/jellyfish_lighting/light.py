@@ -111,7 +111,17 @@ class JellyfishZoneLight(LightEntity):
             self._unsub_pattern()
 
     async def _handle_zone_update(self):
+        # Update state from controller data
+        zone_data = self._client.zones.get(self._zone_name)
+        if zone_data:
+            self._is_on = zone_data.get("ledPower", self._is_on)
+            # If the controller provides the current pattern, update it here
+            self._pattern = zone_data.get("currentPattern", self._pattern)
         self.async_write_ha_state()
 
     async def _handle_pattern_update(self):
+        # Optionally update pattern from controller data if available
+        zone_data = self._client.zones.get(self._zone_name)
+        if zone_data:
+            self._pattern = zone_data.get("currentPattern", self._pattern)
         self.async_write_ha_state()

@@ -36,28 +36,30 @@ class JellyfishPatternSelect(SelectEntity):
         self._attr_options = self._get_patterns()
         self._attr_current_option = None
         self._unsub = None
+        self._unsub_patterns = None
 
     async def async_added_to_hass(self):
         # Listen for pattern updates
-        self._unsub = async_dispatcher_connect(
-            self.hass, f"{DOMAIN}_patterns_updated", self._async_update_patterns
+        self._unsub_patterns = async_dispatcher_connect(
+            self.hass, f"{DOMAIN}_patterns_updated", self._handle_patterns_updated
         )
-        if not self._client.patterns:
-            await self._client.request_pattern_list()
-        await self._async_update_patterns()
+        await self._handle_patterns_updated()
+
+    async def async_will_remove_from_hass(self):
+        if self._unsub_patterns:
+            self._unsub_patterns()
+            self._unsub_patterns = None
+        if self._unsub:
+            self._unsub()
+            self._unsub = None
 
     def _get_patterns(self):
         patterns = self._client.patterns
         return [pat.get("name", "Unknown") for pat in patterns]
 
-    async def _async_update_patterns(self):
+    async def _handle_patterns_updated(self):
         self._attr_options = self._get_patterns()
         self.async_write_ha_state()
-
-    async def async_will_remove_from_hass(self):
-        if self._unsub:
-            self._unsub()
-            self._unsub = None
 
     @property
     def unique_id(self):
