@@ -39,22 +39,16 @@ class JellyfishPatternSelect(SelectEntity):
 
     async def async_added_to_hass(self):
         # Listen for pattern updates
-        def schedule_update():
-            self.hass.async_create_task(self._handle_patterns_updated())
         self._unsub = async_dispatcher_connect(
-            self.hass, f"{DOMAIN}_patterns_updated", schedule_update
+            self.hass, f"{DOMAIN}_patterns_updated", self._async_update_patterns
         )
         if not self._client.patterns:
             await self._client.request_pattern_list()
-        await self._handle_patterns_updated()
+        await self._async_update_patterns()
 
     def _get_patterns(self):
         patterns = self._client.patterns
         return [pat.get("name", "Unknown") for pat in patterns]
-
-    def _handle_patterns_updated(self):
-        # Schedule the state update on the event loop
-        self.hass.add_job(self._async_update_patterns)
 
     async def _async_update_patterns(self):
         self._attr_options = self._get_patterns()
