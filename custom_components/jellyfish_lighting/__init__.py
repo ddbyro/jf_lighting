@@ -21,8 +21,15 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
     try:
-        # Correct forwarding for config entry setup
-        await hass.config_entries.async_forward_entry_setup(entry, "light")
+        # Try modern method first
+        if hasattr(hass.config_entries, "async_forward_entry_setup"):
+            await hass.config_entries.async_forward_entry_setup(entry, "light")
+        # Fallback for older HA versions
+        elif hasattr(hass, "async_create_task") and hasattr(hass.config_entries, "async_forward_entry_setups"):
+            hass.async_create_task(hass.config_entries.async_forward_entry_setups([entry], "light"))
+        else:
+            # Last fallback: store config entry data for platform setup
+            hass.data.setdefault(DOMAIN, {})[entry.entry_id] = entry.data
         return True
     except Exception as e:
         _LOGGER.error(f"Error setting up Jellyfish Lighting entry: {e}")
