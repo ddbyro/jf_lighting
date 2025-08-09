@@ -39,5 +39,6 @@ async def async_unload_entry(hass: HomeAssistant, entry) -> bool:
     unload = getattr(hass, "async_forward_entry_unload", None)
     if unload:
         return await unload(entry, "light")
-    hass.data[DOMAIN].pop(entry.entry_id, None)
+    if DOMAIN in hass.data:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
     return True
