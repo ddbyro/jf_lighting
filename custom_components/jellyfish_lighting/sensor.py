@@ -1,7 +1,7 @@
 import logging
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
-from .const import DOMAIN, SIGNAL_ZONES_UPDATED
+from .const import DOMAIN, SIGNAL_ZONES_UPDATED, SIGNAL_PATTERNS_UPDATED
 from .websocket_api import JellyfishClient
 
 _LOGGER = logging.getLogger(__name__)
