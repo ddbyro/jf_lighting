@@ -2,22 +2,15 @@ import asyncio
 import json
 import logging
 from typing import Any, Dict, List, Optional
-
-from aiohttp import ClientSession, ClientWebSocketResponse, WSServerHandshakeError
-
-from homeassistant.core import HomeAssistant, callback
-
-from .const import DOMAIN
-
+from aiohttp import ClientSession, ClientWebSocketResponse
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from homeassistant.helpers import entity_registry, entity_platform
-
+from .const import DOMAIN, SIGNAL_PATTERNS_UPDATED, SIGNAL_ZONES_UPDATED
 
 _LOGGER = logging.getLogger(__name__)
 
 class JellyfishClient:
-    def __init__(self, hass: HomeAssistant, host: str, port: int = 80):
+    def __init__(self, hass, host: str, port: int = 9000):
         self.hass = hass
         self.host = host
         self.port = port
@@ -50,6 +43,8 @@ class JellyfishClient:
             self._connected_event.set()
             _LOGGER.info("Connected to Jellyfish controller %s", url)
             self._read_task = asyncio.create_task(self._read_loop())
+            await self.request_pattern_list()
+            await self.request_zones()
         except Exception as exc:
             _LOGGER.warning("Failed to connect to %s: %s", url, exc)
             self._schedule_reconnect()
@@ -101,10 +96,10 @@ class JellyfishClient:
         if cmd == "fromCtlr":
             if "patternFileList" in payload:
                 self._patterns = payload["patternFileList"]
-                async_dispatcher_send(self.hass, f"{DOMAIN}_patterns_updated")
+                async_dispatcher_send(self.hass, SIGNAL_PATTERNS_UPDATED)
             if "zones" in payload:
                 self._zones = payload["zones"]
-                async_dispatcher_send(self.hass, f"{DOMAIN}_zones_updated")
+                async_dispatcher_send(self.hass, SIGNAL_ZONES_UPDATED)
 
     async def _send(self, payload: Dict[str, Any]):
         await self._connected_event.wait()
@@ -116,7 +111,6 @@ class JellyfishClient:
         except Exception as exc:
             _LOGGER.exception("Failed to send payload: %s", exc)
 
-    # Convenience methods:
     async def request_pattern_list(self):
         await self._send({"cmd": "toCtlrGet", "get": [["patternFileList"]]})
 
@@ -131,26 +125,7 @@ class JellyfishClient:
                 "data": "",
                 "id": "",
                 "state": state,
-                "zoneName": zone_names
-            }
+                "zoneName": zone_names,
+            },
         }
         await self._send(payload)
-
-    async def run_pattern_advanced(self, data: str, zone_names: List[str], state: int = 1):
-        payload = {
-            "cmd": "toCtlrSet",
-            "runPattern": {
-                "file": "",
-                "data": data,
-                "id": "",
-                "state": state,
-                "zoneName": zone_names
-            }
-        }
-        await self._send(payload)
-
-    async def get_pattern_file_data(self, folder: str, filename: str):
-        payload = {"cmd": "toCtlrGet", "get": [["patternFileData", folder, filename]]}
-        await self._send(payload)
-        # Not waiting for response here; controller will send fromCtlr containing patternFileData
-        return True

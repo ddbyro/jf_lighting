@@ -1,62 +1,46 @@
-import asyncio
 import logging
-
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.helpers import entity_registry
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers import service
 
-from .const import DOMAIN, PLATFORMS, DEFAULT_PORT, SERVICE_RUN_PATTERN, SERVICE_RUN_PATTERN_ADV, SERVICE_GET_PATTERN_DATA
-from .websocket_api import JellyfishClient
+from .const import DOMAIN, CONF_HOST, CONF_PORT
+from .jellyfish_client import JellyfishClient
 
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup(hass: HomeAssistant, config: dict):
-    hass.data.setdefault(DOMAIN, {})
-    return True
+    jellyfish_config = config.get(DOMAIN)
+    if not jellyfish_config or CONF_HOST not in jellyfish_config:
+        _LOGGER.error("No host configured for Jellyfish Lighting")
+        return False
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
-    host = entry.data.get(CONF_HOST)
-    port = entry.data.get(CONF_PORT, DEFAULT_PORT)
+    host = jellyfish_config[CONF_HOST]
+    port = jellyfish_config.get(CONF_PORT, 9000)
+
     client = JellyfishClient(hass, host, port)
     await client.connect()
 
-    hass.data[DOMAIN][entry.entry_id] = {
-        "client": client,
-        "entry": entry
-    }
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN]["client"] = client
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    async def async_run_pattern_service(call):
+        pattern = hass.states.get("input_select.jellyfish_patterns")
+        zones = hass.states.get("input_select.jellyfish_zones")
+        if not pattern or not zones:
+            _LOGGER.error("Input selects for patterns or zones missing")
+            return
+        selected_pattern = pattern.state
+        selected_zone = zones.state
+        state_val = call.data.get("state", 1)
+        await client.run_pattern(selected_pattern, [selected_zone], state_val)
 
-    # Register services
-    async def async_run_pattern(call):
-        await client.run_pattern(
-            file=call.data.get("file", ""),
-            zone_names=call.data.get("zone_names", []),
-            state=call.data.get("state", 1),
-        )
-
-    async def async_run_pattern_adv(call):
-        await client.run_pattern_advanced(
-            data=call.data.get("data", ""),
-            zone_names=call.data.get("zone_names", []),
-            state=call.data.get("state", 1),
-        )
-
-    async def async_get_pattern_data(call):
-        folder = call.data.get("folder")
-        filename = call.data.get("filename")
-        return await client.get_pattern_file_data(folder, filename)
-
-    hass.services.async_register(DOMAIN, SERVICE_RUN_PATTERN, async_run_pattern)
-    hass.services.async_register(DOMAIN, SERVICE_RUN_PATTERN_ADV, async_run_pattern_adv)
-    hass.services.async_register(DOMAIN, SERVICE_GET_PATTERN_DATA, async_get_pattern_data)
+    hass.services.async_register(DOMAIN, "run_pattern", async_run_pattern_service)
 
     return True
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
-    data = hass.data[DOMAIN].pop(entry.entry_id, None)
-    if not data:
-        return True
-    client: JellyfishClient = data["client"]
-    await client.disconnect()
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+async def async_unload_entry(hass: HomeAssistant, entry):
+    client = hass.data[DOMAIN].get("client")
+    if client:
+        await client.disconnect()
+    return True

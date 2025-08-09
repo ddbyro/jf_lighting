@@ -1,10 +1,7 @@
-DOMAIN = "jellyfish"
-PLATFORMS = ["light"]
-DEFAULT_PORT = 80
-
+DOMAIN = "jellyfish_lighting"
 CONF_HOST = "host"
 CONF_PORT = "port"
+DEFAULT_PORT = 9000
 
-SERVICE_RUN_PATTERN = "run_pattern"
-SERVICE_RUN_PATTERN_ADV = "run_pattern_advanced"
-SERVICE_GET_PATTERN_DATA = "get_pattern_data"
+SIGNAL_PATTERNS_UPDATED = f"{DOMAIN}_patterns_updated"
+SIGNAL_ZONES_UPDATED = f"{DOMAIN}_zones_updated"
