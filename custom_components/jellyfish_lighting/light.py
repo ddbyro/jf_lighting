@@ -15,12 +15,27 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     api = JellyfishLightingAPI(host, api_key)
     async_add_entities([JellyfishLight(api)])
 
+class JellyfishLighting:
+    def __init__(self, host, api_key=None):
+        self.api = JellyfishLightingAPI(host, api_key)
+        self._lights = []
+
+    async def get_lights(self):
+        # If the API supports multiple lights/zones, fetch them here
+        # For now, assume a single light
+        return [self.api]
+
+    async def close(self):
+        await self.api.close()
+
 async def async_setup_entry(hass, entry, async_add_entities):
-    entry_data = hass.data[DOMAIN][entry.entry_id]
+    entry_data = hass.data[DOMAIN][entry.entry_id] if DOMAIN in hass.data and entry.entry_id in hass.data[DOMAIN] else entry.data
     host = entry_data.get("host")
     api_key = entry_data.get("api_key")
-    api = JellyfishLightingAPI(host, api_key)
-    async_add_entities([JellyfishLight(api)])
+    lighting = JellyfishLighting(host, api_key)
+    lights = await lighting.get_lights()
+    entities = [JellyfishLight(light_api) for light_api in lights]
+    async_add_entities(entities)
 
 class JellyfishLight(LightEntity):
     def __init__(self, api: JellyfishLightingAPI):
@@ -30,6 +45,9 @@ class JellyfishLight(LightEntity):
         self._effect = None
         self._available_effects = []
         self._name = "Jellyfish Lighting"
+
+    async def async_added_to_hass(self):
+        await self.async_update()
 
     @property
     def name(self):
@@ -56,33 +74,42 @@ class JellyfishLight(LightEntity):
         return SUPPORT_COLOR | SUPPORT_EFFECT
 
     async def async_turn_on(self, **kwargs):
-        if "rgb_color" in kwargs:
-            r, g, b = kwargs["rgb_color"]
-            await self._api.set_color(r, g, b)
-            self._rgb_color = (r, g, b)
-        if "effect" in kwargs:
-            await self._api.set_effect(kwargs["effect"])
-            self._effect = kwargs["effect"]
-        await self._api.set_power(True)
-        self._is_on = True
-        await self.async_update()
+        try:
+            if "rgb_color" in kwargs:
+                r, g, b = kwargs["rgb_color"]
+                await self._api.set_color(r, g, b)
+                self._rgb_color = (r, g, b)
+            if "effect" in kwargs:
+                await self._api.set_effect(kwargs["effect"])
+                self._effect = kwargs["effect"]
+            await self._api.set_power(True)
+            self._is_on = True
+            await self.async_update()
+        except Exception as e:
+            _LOGGER.error(f"Error turning on Jellyfish Lighting: {e}")
 
     async def async_turn_off(self, **kwargs):
-        await self._api.set_power(False)
-        self._is_on = False
-        await self.async_update()
+        try:
+            await self._api.set_power(False)
+            self._is_on = False
+            await self.async_update()
+        except Exception as e:
+            _LOGGER.error(f"Error turning off Jellyfish Lighting: {e}")
 
     async def async_update(self):
-        status = await self._api.get_status()
-        if status:
-            self._is_on = status.get("on", self._is_on)
-            color = status.get("color", {})
-            self._rgb_color = (
-                color.get("r", 255),
-                color.get("g", 255),
-                color.get("b", 255)
-            )
-            self._effect = status.get("effect", self._effect)
-        effects = await self._api.get_effects()
-        if effects:
-            self._available_effects = effects.get("effects", [])
+        try:
+            status = await self._api.get_status()
+            if status:
+                self._is_on = status.get("on", self._is_on)
+                color = status.get("color", {})
+                self._rgb_color = (
+                    color.get("r", 255),
+                    color.get("g", 255),
+                    color.get("b", 255)
+                )
+                self._effect = status.get("effect", self._effect)
+            effects = await self._api.get_effects()
+            if effects:
+                self._available_effects = effects.get("effects", [])
+        except Exception as e:
+            _LOGGER.error(f"Error updating Jellyfish Lighting: {e}")
