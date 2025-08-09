@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from homeassistant.components.light import LightEntity, COLOR_MODE_ONOFF
+from homeassistant.components.light import LightEntity, ColorMode
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -23,18 +23,15 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
                 added_zones.add(zone_name)
         async_add_entities(list(entities), True)
 
-    def schedule_add_zone_entities():
-        hass.async_create_task(add_zone_entities())
-
-    # Subscribe to zone updates
-    async_dispatcher_connect(hass, f"{DOMAIN}_zones_updated", schedule_add_zone_entities)
+    # Subscribe to zone updates with async callback
+    async_dispatcher_connect(hass, f"{DOMAIN}_zones_updated", add_zone_entities)
     # Initial request
     await client.request_zones()
     await add_zone_entities()
 
 class JellyfishZoneLight(LightEntity):
-    _attr_supported_color_modes = {COLOR_MODE_ONOFF}
-    _attr_color_mode = COLOR_MODE_ONOFF
+    _attr_supported_color_modes = {ColorMode.ONOFF}
+    _attr_color_mode = ColorMode.ONOFF
 
     def __init__(self, client: JellyfishClient, zone_name: str):
         self._client = client
