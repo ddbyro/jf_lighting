@@ -16,18 +16,18 @@ async def async_setup(hass: HomeAssistant, config: dict):
     hass.data.setdefault(DOMAIN, {})
     return True
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
-    host = entry.data.get(CONF_HOST)
-    port = entry.data.get(CONF_PORT, DEFAULT_PORT)
+async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities):
+    host = config_entry.data.get(CONF_HOST)
+    port = config_entry.data.get(CONF_PORT, DEFAULT_PORT)
     client = JellyfishClient(hass, host, port)
     await client.connect()
 
-    hass.data[DOMAIN][entry.entry_id] = {
+    hass.data[DOMAIN][config_entry.entry_id] = {
         "client": client,
-        "entry": entry
+        "entry": config_entry
     }
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
     # Register services
     async def async_run_pattern(call):
@@ -69,7 +69,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     hass.services.async_register(DOMAIN, SERVICE_GET_PATTERN_DATA, async_get_pattern_data)
     hass.services.async_register(DOMAIN, "set_zone_pattern", async_set_zone_pattern)
 
-    client: JellyfishClient = hass.data[DOMAIN][entry.entry_id]["client"]
+    client: JellyfishClient = hass.data[DOMAIN][config_entry.entry_id]["client"]
     entities = {}
     added_zones = set()
 
@@ -82,7 +82,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 new_entities.append(select_entity)
                 added_zones.add(zone_name)
         if new_entities:
-            await hass.helpers.entity_registry.async_add_entities(new_entities, True)
+            async_add_entities(new_entities, True)
 
     async_dispatcher_connect(hass, SIGNAL_PATTERNS_UPDATED, add_zone_select_entities)
     await client.request_pattern_list()
