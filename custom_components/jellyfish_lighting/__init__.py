@@ -21,7 +21,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
     """
-    Set up Jellyfish Lighting from a config entry (UI wizard).
+    Store config entry data for platform setup.
     """
-    hass.async_create_task(hass.config_entries.async_forward_entry_setup(entry, "light"))
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = entry.data
     return True
