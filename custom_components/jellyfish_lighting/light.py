@@ -1,122 +1,85 @@
-"""
-Jellyfish Lighting Light Entity for Home Assistant
-"""
 import logging
-from homeassistant.components.light import LightEntity, SUPPORT_COLOR, SUPPORT_EFFECT
-from homeassistant.const import CONF_HOST, CONF_API_KEY
-from .api import JellyfishLightingAPI
+from typing import Any
+
+from homeassistant.components.light import LightEntity, SUPPORT_BRIGHTNESS, ATTR_BRIGHTNESS
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity import DeviceInfo
+
 from .const import DOMAIN
+from .websocket_api import JellyfishClient
 
 _LOGGER = logging.getLogger(__name__)
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    host = config.get(CONF_HOST)
-    api_key = config.get(CONF_API_KEY)
-    api = JellyfishLightingAPI(host, api_key)
-    async_add_entities([JellyfishLight(api)])
+async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
+    client: JellyfishClient = hass.data[DOMAIN][entry.entry_id]["client"]
+    # request the zones and patterns at setup
+    await client.request_zones()
+    await client.request_pattern_list()
 
-class JellyfishLighting:
-    def __init__(self, host, api_key=None):
-        self.api = JellyfishLightingAPI(host, api_key)
+    # wait a short moment to let controller respond (in practice you can wait or subscribe to dispatcher)
+    await hass.async_add_executor_job(lambda: None)
 
-    def get_groups(self):
-        # Use synchronous call since websocket-client is blocking
-        return self.api.get_groups()
-
-    def close(self):
-        pass  # No persistent connection to close
-
-async def async_setup_entry(hass, entry, async_add_entities):
-    entry_data = hass.data[DOMAIN][entry.entry_id] if DOMAIN in hass.data and entry.entry_id in hass.data[DOMAIN] else entry.data
-    host = entry_data.get("host")
-    api_key = entry_data.get("api_key")
-    lighting = JellyfishLighting(host, api_key)
-    groups = lighting.get_groups()
+    # Create zone lights from client.zones
     entities = []
-    if groups:
-        for group in groups:
-            entities.append(JellyfishLight(lighting.api, group))
-    else:
-        entities.append(JellyfishLight(lighting.api, None))
-    async_add_entities(entities)
+    for zone_name in client.zones.keys():
+        entities.append(JellyfishZoneLight(client, zone_name))
+    async_add_entities(entities, True)
 
-class JellyfishLight(LightEntity):
-    def __init__(self, api: JellyfishLightingAPI, group: dict = None):
-        self._api = api
-        self._group = group
+class JellyfishZoneLight(LightEntity):
+    def __init__(self, client: JellyfishClient, zone_name: str):
+        self._client = client
+        self._zone_name = zone_name
+        self._attr_name = f"Jellyfish {zone_name}"
         self._is_on = False
-        self._rgb_color = (255, 255, 255)
-        self._effect = None
-        self._available_effects = group["patterns"] if group else []
-        self._name = group["name"] if group else "Jellyfish Lighting"
-        self._group_id = group["name"] if group else None
-
-    async def async_added_to_hass(self):
-        await self.async_update()
-
-    @property
-    def name(self):
-        return self._name
+        self._brightness = 255
 
     @property
     def unique_id(self):
-        return f"jellyfish_{self._group_id}" if self._group_id else None
+        return f"jellyfish_zone_{self._zone_name}"
 
     @property
     def is_on(self):
         return self._is_on
 
     @property
-    def rgb_color(self):
-        return self._rgb_color
-
-    @property
-    def effect_list(self):
-        return self._available_effects
-
-    @property
-    def effect(self):
-        return self._effect
-
-    @property
     def supported_features(self):
-        return SUPPORT_COLOR | SUPPORT_EFFECT
+        return SUPPORT_BRIGHTNESS
 
-    async def async_turn_on(self, **kwargs):
-        try:
-            state = 1
-            zone_name = self._group_id
-            if "effect" in kwargs:
-                pattern = kwargs["effect"]
-                self._api.set_pattern(pattern, state, zone_name)
-                self._effect = pattern
-            else:
-                self._api.set_power(state, zone_name)
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, "controller")},
+            name="Jellyfish Controller"
+        )
+
+    async def async_turn_on(self, **kwargs: Any):
+        # If brightness provided, convert 0-255 from HA to percentage 0-100
+        brightness = kwargs.get(ATTR_BRIGHTNESS)
+        if brightness is not None:
+            percent = int((brightness / 255) * 100)
+            # Build a simple runData JSON: use a basic type with brightness and keep others defaults
+            rundata = {
+                "colors": [255, 255, 255],
+                "spaceBetweenPixels": 1,
+                "effectBetweenPixels": "No Color Transformation",
+                "type": "Color",
+                "skip": 1,
+                "numOfLeds": 1,
+                "runData": {"speed": 50, "brightness": percent, "effect": "No Effect", "effectValue": 0, "rgbAdj": [100,100,100]},
+                "direction": "Right"
+            }
+            await self._client.run_pattern_advanced(json.dumps(rundata), [self._zone_name], state=1)
+            self._brightness = brightness
             self._is_on = True
-            await self.async_update()
-        except Exception as e:
-            _LOGGER.error(f"Error turning on Jellyfish Lighting: {e}")
+            self.async_write_ha_state()
+            return
 
-    async def async_turn_off(self, **kwargs):
-        try:
-            state = 0
-            zone_name = self._group_id
-            self._api.set_power(state, zone_name)
-            self._is_on = False
-            await self.async_update()
-        except Exception as e:
-            _LOGGER.error(f"Error turning off Jellyfish Lighting: {e}")
+        # Otherwise run last known pattern on this zone (or all)
+        await self._client.run_pattern(file="", zone_names=[self._zone_name], state=1)
+        self._is_on = True
+        self.async_write_ha_state()
 
-    async def async_update(self):
-        try:
-            zone_name = self._group_id
-            power = self._api.get_state()
-            self._is_on = power == True
-            # Only show patterns for this group
-            if self._group:
-                self._available_effects = self._group["patterns"]
-            else:
-                patterns = self._api.get_patterns()
-                self._available_effects = [p["name"] for p in patterns]
-        except Exception as e:
-            _LOGGER.error(f"Error updating Jellyfish Lighting: {e}")
+    async def async_turn_off(self, **kwargs: Any):
+        await self._client.run_pattern(file="", zone_names=[self._zone_name], state=0)
+        self._is_on = False
+        self.async_write_ha_state()

@@ -1,11 +1,10 @@
 {
-  "domain": "jellyfish_lighting",
+  "domain": "jellyfish",
   "name": "Jellyfish Lighting",
-  "documentation": "https://github.com/parkerjfl/JellyfishLightingAPIExplorer/blob/main/Jellyfish%20Lighting%20API%20Documentation%20(1).pdf",
+  "version": "0.1.0",
+  "documentation": "https://github.com/your-repo",
   "requirements": [],
   "dependencies": [],
-  "codeowners": ["@your-github-username"],
-  "config_flow": true,
-  "version": "0.1.0",
-  "platforms": ["light"]
+  "codeowners": ["@your-github"],
+  "iot_class": "local_polling"
 }
