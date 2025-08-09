@@ -1,6 +1,7 @@
 import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from .const import DOMAIN
 from .websocket_api import JellyfishClient
 
@@ -23,9 +24,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         if new_entities:
             async_add_entities(new_entities, True)
 
-    hass.helpers.dispatcher.async_dispatcher_connect(
-        f"{DOMAIN}_zones_updated", add_zone_select_entities
-    )
+    async_dispatcher_connect(hass, f"{DOMAIN}_zones_updated", add_zone_select_entities)
     await client.request_zones()
     await add_zone_select_entities()
 
@@ -57,4 +56,3 @@ class JellyfishPatternSelect(SelectEntity):
         await self._client.run_pattern(file=option, zone_names=[self._zone_name], state=1)
         self._attr_current_option = option
         self.async_write_ha_state()
-
