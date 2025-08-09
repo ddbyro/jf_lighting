@@ -42,6 +42,11 @@ class JellyfishPatternSelect(SelectEntity):
         self._unsub = async_dispatcher_connect(
             self.hass, f"{DOMAIN}_patterns_updated", self._handle_patterns_updated
         )
+        # Request patterns if not loaded
+        if not self._client.patterns:
+            await self._client.request_pattern_list()
+        # Force initial update
+        self._handle_patterns_updated()
 
     async def async_will_remove_from_hass(self):
         if self._unsub:
