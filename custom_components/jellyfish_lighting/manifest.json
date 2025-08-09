@@ -5,5 +5,6 @@
   "requirements": [],
   "dependencies": [],
   "codeowners": ["@your-github-username"],
-  "config_flow": true
+  "config_flow": true,
+  "version": "0.1.0"
 }
