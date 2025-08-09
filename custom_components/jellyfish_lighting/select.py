@@ -2,7 +2,7 @@ import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_PATTERNS_UPDATED
 from .websocket_api import JellyfishClient
 
 _LOGGER = logging.getLogger(__name__)
