@@ -33,6 +33,7 @@ class JellyfishLightingAPI:
     def get_patterns(self):
         payload = {"cmd": "toCtlrGet", "get": [["patternFileList"]]}
         resp = self._send_ws(payload)
+        _LOGGER.info(f"Full patternFileList response: {resp}")
         return resp["patternFileList"] if resp and "patternFileList" in resp else []
 
     def get_groups(self):
