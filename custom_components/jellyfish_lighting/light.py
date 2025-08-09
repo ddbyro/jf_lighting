@@ -13,15 +13,19 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
     client: JellyfishClient = hass.data[DOMAIN][entry.entry_id]["client"]
-    entities = []
+    entities = {}
     added_zones = set()
 
     async def add_zone_entities():
+        new_entities = []
         for zone_name in client.zones.keys():
             if zone_name not in added_zones:
-                entities.append(JellyfishZoneLight(client, zone_name))
+                entity = JellyfishZoneLight(client, zone_name)
+                entities[zone_name] = entity
+                new_entities.append(entity)
                 added_zones.add(zone_name)
-        async_add_entities(list(entities), True)
+        if new_entities:
+            async_add_entities(new_entities, True)
 
     # Subscribe to zone updates with async callback
     async_dispatcher_connect(hass, f"{DOMAIN}_zones_updated", add_zone_entities)
