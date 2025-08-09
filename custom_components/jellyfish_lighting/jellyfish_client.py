@@ -36,7 +36,7 @@ class JellyfishClient:
         await self._connect_ws()
 
     async def _connect_ws(self):
-        url = f"ws://{self.host}:{self.port}/"
+        url = f"ws://{self.host}:{self.port}/ws"
         try:
             _LOGGER.debug("Connecting to Jellyfish controller at %s", url)
             self._ws = await self._session.ws_connect(url, heartbeat=30)
@@ -96,6 +96,7 @@ class JellyfishClient:
         if cmd == "fromCtlr":
             if "patternFileList" in payload:
                 self._patterns = payload["patternFileList"]
+                _LOGGER.debug(f"JellyfishClient received patternFileList: {self._patterns}")
                 async_dispatcher_send(self.hass, SIGNAL_PATTERNS_UPDATED)
             if "zones" in payload:
                 self._zones = payload["zones"]
