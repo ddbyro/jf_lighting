@@ -44,6 +44,26 @@ class JellyfishLightingAPI:
     async def get_effects(self):
         return await self._request("GET", "effects")
 
+    async def get_groups(self):
+        return await self._request("GET", "groups")
+
+    async def get_group_status(self, group_id):
+        return await self._request("GET", f"groups/{group_id}/status")
+
+    async def set_group_power(self, group_id, on: bool):
+        return await self._request("POST", f"groups/{group_id}/power", json={"on": on})
+
+    async def set_group_color(self, group_id, r: int, g: int, b: int):
+        return await self._request("POST", f"groups/{group_id}/color", json={"r": r, "g": g, "b": b})
+
+    async def set_group_effect(self, group_id, effect_name: str, params: dict = None):
+        data = {"effect": effect_name}
+        if params:
+            data.update(params)
+        return await self._request("POST", f"groups/{group_id}/effect", json=data)
+
+    async def get_group_effects(self, group_id):
+        return await self._request("GET", f"groups/{group_id}/effects")
+
     async def close(self):
         await self.session.close()
-
