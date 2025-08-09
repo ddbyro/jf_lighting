@@ -2,7 +2,7 @@
   "domain": "jellyfish",
   "name": "Jellyfish Lighting",
   "version": "0.1.0",
-  "documentation": "https://github.com/your-repo",
+  "config_flow": true,
   "requirements": [],
   "dependencies": [],
   "codeowners": ["@your-github"],
