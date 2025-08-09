@@ -7,7 +7,7 @@ from aiohttp import ClientSession, ClientWebSocketResponse, WSServerHandshakeErr
 
 from homeassistant.core import HomeAssistant, callback
 
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_PATTERNS_UPDATED, SIGNAL_ZONES_UPDATED
 
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
@@ -101,10 +101,10 @@ class JellyfishClient:
         if cmd == "fromCtlr":
             if "patternFileList" in payload:
                 self._patterns = payload["patternFileList"]
-                async_dispatcher_send(self.hass, f"{DOMAIN}_patterns_updated")
+                async_dispatcher_send(self.hass, SIGNAL_PATTERNS_UPDATED)
             if "zones" in payload:
                 self._zones = payload["zones"]
-                async_dispatcher_send(self.hass, f"{DOMAIN}_zones_updated")
+                async_dispatcher_send(self.hass, SIGNAL_ZONES_UPDATED)
 
     async def _send(self, payload: Dict[str, Any]):
         await self._connected_event.wait()
