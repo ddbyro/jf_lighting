@@ -19,23 +19,19 @@ class JellyfishLighting:
     def __init__(self, host, api_key=None):
         self.api = JellyfishLightingAPI(host, api_key)
 
-    async def get_groups(self):
-        try:
-            groups_resp = await self.api.get_groups()
-            return groups_resp.get("groups", []) if groups_resp else []
-        except Exception as e:
-            _LOGGER.error(f"Error fetching Jellyfish Lighting groups: {e}")
-            return []
+    def get_groups(self):
+        # Use synchronous call since websocket-client is blocking
+        return self.api.get_groups()
 
-    async def close(self):
-        await self.api.close()
+    def close(self):
+        pass  # No persistent connection to close
 
 async def async_setup_entry(hass, entry, async_add_entities):
     entry_data = hass.data[DOMAIN][entry.entry_id] if DOMAIN in hass.data and entry.entry_id in hass.data[DOMAIN] else entry.data
     host = entry_data.get("host")
     api_key = entry_data.get("api_key")
     lighting = JellyfishLighting(host, api_key)
-    groups = await lighting.get_groups()
+    groups = lighting.get_groups()
     entities = []
     if groups:
         for group in groups:
@@ -45,15 +41,15 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(entities)
 
 class JellyfishLight(LightEntity):
-    def __init__(self, api: JellyfishLightingAPI, group: dict = None):
+    def __init__(self, api: JellyfishLightingAPI, group: str = None):
         self._api = api
         self._group = group
         self._is_on = False
         self._rgb_color = (255, 255, 255)
         self._effect = None
         self._available_effects = []
-        self._name = group["name"] if group else "Jellyfish Lighting"
-        self._group_id = group["id"] if group and "id" in group else None
+        self._name = group if group else "Jellyfish Lighting"
+        self._group_id = group if group else None
 
     async def async_added_to_hass(self):
         await self.async_update()
@@ -88,24 +84,14 @@ class JellyfishLight(LightEntity):
 
     async def async_turn_on(self, **kwargs):
         try:
-            if self._group_id:
-                if "rgb_color" in kwargs:
-                    r, g, b = kwargs["rgb_color"]
-                    await self._api.set_group_color(self._group_id, r, g, b)
-                    self._rgb_color = (r, g, b)
-                if "effect" in kwargs:
-                    await self._api.set_group_effect(self._group_id, kwargs["effect"])
-                    self._effect = kwargs["effect"]
-                await self._api.set_group_power(self._group_id, True)
+            state = 1
+            zone_name = self._group_id
+            if "effect" in kwargs:
+                pattern = kwargs["effect"]
+                self._api.set_pattern(pattern, state, zone_name)
+                self._effect = pattern
             else:
-                if "rgb_color" in kwargs:
-                    r, g, b = kwargs["rgb_color"]
-                    await self._api.set_color(r, g, b)
-                    self._rgb_color = (r, g, b)
-                if "effect" in kwargs:
-                    await self._api.set_effect(kwargs["effect"])
-                    self._effect = kwargs["effect"]
-                await self._api.set_power(True)
+                self._api.set_power(state, zone_name)
             self._is_on = True
             await self.async_update()
         except Exception as e:
@@ -113,10 +99,9 @@ class JellyfishLight(LightEntity):
 
     async def async_turn_off(self, **kwargs):
         try:
-            if self._group_id:
-                await self._api.set_group_power(self._group_id, False)
-            else:
-                await self._api.set_power(False)
+            state = 0
+            zone_name = self._group_id
+            self._api.set_power(state, zone_name)
             self._is_on = False
             await self.async_update()
         except Exception as e:
@@ -124,22 +109,11 @@ class JellyfishLight(LightEntity):
 
     async def async_update(self):
         try:
-            if self._group_id:
-                status = await self._api.get_group_status(self._group_id)
-                effects = await self._api.get_group_effects(self._group_id)
-            else:
-                status = await self._api.get_status()
-                effects = await self._api.get_effects()
-            if status:
-                self._is_on = status.get("on", self._is_on)
-                color = status.get("color", {})
-                self._rgb_color = (
-                    color.get("r", 255),
-                    color.get("g", 255),
-                    color.get("b", 255)
-                )
-                self._effect = status.get("effect", self._effect)
-            if effects:
-                self._available_effects = effects.get("effects", [])
+            zone_name = self._group_id
+            power = self._api.get_state()
+            self._is_on = power == True
+            patterns = self._api.get_patterns()
+            self._available_effects = [p["name"] for p in patterns if p.get("folders") == zone_name] if zone_name else [p["name"] for p in patterns]
+            # No direct color support in API, so leave as last set
         except Exception as e:
             _LOGGER.error(f"Error updating Jellyfish Lighting: {e}")

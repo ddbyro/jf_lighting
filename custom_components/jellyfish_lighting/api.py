@@ -1,7 +1,8 @@
 """
 Jellyfish Lighting API Client
 """
-import aiohttp
+import websocket
+import json
 import logging
 
 _LOGGER = logging.getLogger(__name__)
@@ -10,60 +11,63 @@ class JellyfishLightingAPI:
     def __init__(self, host: str, api_key: str = None):
         self.host = host
         self.api_key = api_key
-        self.base_url = f"http://{host}/api"
-        self.session = aiohttp.ClientSession()
+        self.ws_url = f"ws://{host}:9000/ws"
 
-    async def _request(self, method, endpoint, **kwargs):
-        url = f"{self.base_url}/{endpoint}"
-        headers = {}
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
+    def _send_ws(self, payload):
         try:
-            async with self.session.request(method, url, headers=headers, **kwargs) as resp:
-                resp.raise_for_status()
-                return await resp.json()
+            ws = websocket.WebSocket()
+            ws.connect(self.ws_url)
+            ws.send(json.dumps(payload))
+            resp = ws.recv()
+            ws.close()
+            return json.loads(resp)
         except Exception as e:
-            _LOGGER.error(f"API request error: {e}")
+            _LOGGER.error(f"WebSocket error: {e}")
             return None
 
-    async def get_status(self):
-        return await self._request("GET", "status")
+    def get_state(self):
+        payload = {"cmd": "toCtlrGet", "get": [["ledPower"]]}
+        resp = self._send_ws(payload)
+        return resp["ledPower"] if resp and "ledPower" in resp else None
 
-    async def set_power(self, on: bool):
-        return await self._request("POST", "power", json={"on": on})
+    def get_patterns(self):
+        payload = {"cmd": "toCtlrGet", "get": [["patternFileList"]]}
+        resp = self._send_ws(payload)
+        return resp["patternFileList"] if resp and "patternFileList" in resp else []
 
-    async def set_color(self, r: int, g: int, b: int):
-        return await self._request("POST", "color", json={"r": r, "g": g, "b": b})
+    def get_groups(self):
+        # Groups/zones are typically in the config or pattern response
+        patterns = self.get_patterns()
+        groups = set()
+        for pattern in patterns:
+            if "folders" in pattern:
+                groups.add(pattern["folders"])
+        return list(groups)
 
-    async def set_effect(self, effect_name: str, params: dict = None):
-        data = {"effect": effect_name}
-        if params:
-            data.update(params)
-        return await self._request("POST", "effect", json=data)
+    def set_power(self, state: int, zone_name=None):
+        payload = {
+            "cmd": "toCtlrSet",
+            "runPattern": {
+                "file": "",
+                "data": "",
+                "id": zone_name if zone_name else "Zone",
+                "state": state,
+                "zoneName": [zone_name] if zone_name else ["Zone"]
+            }
+        }
+        return self._send_ws(payload)
 
-    async def get_effects(self):
-        return await self._request("GET", "effects")
+    def set_pattern(self, pattern_name, state=1, zone_name=None):
+        payload = {
+            "cmd": "toCtlrSet",
+            "runPattern": {
+                "file": pattern_name,
+                "data": "",
+                "id": zone_name if zone_name else "Zone",
+                "state": state,
+                "zoneName": [zone_name] if zone_name else ["Zone"]
+            }
+        }
+        return self._send_ws(payload)
 
-    async def get_groups(self):
-        return await self._request("GET", "groups")
-
-    async def get_group_status(self, group_id):
-        return await self._request("GET", f"groups/{group_id}/status")
-
-    async def set_group_power(self, group_id, on: bool):
-        return await self._request("POST", f"groups/{group_id}/power", json={"on": on})
-
-    async def set_group_color(self, group_id, r: int, g: int, b: int):
-        return await self._request("POST", f"groups/{group_id}/color", json={"r": r, "g": g, "b": b})
-
-    async def set_group_effect(self, group_id, effect_name: str, params: dict = None):
-        data = {"effect": effect_name}
-        if params:
-            data.update(params)
-        return await self._request("POST", f"groups/{group_id}/effect", json=data)
-
-    async def get_group_effects(self, group_id):
-        return await self._request("GET", f"groups/{group_id}/effects")
-
-    async def close(self):
-        await self.session.close()
+    # Add more methods as needed for color/effect if supported by the controller
