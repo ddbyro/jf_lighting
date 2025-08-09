@@ -18,12 +18,15 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 class JellyfishLighting:
     def __init__(self, host, api_key=None):
         self.api = JellyfishLightingAPI(host, api_key)
-        self._lights = []
 
-    async def get_lights(self):
-        # If the API supports multiple lights/zones, fetch them here
-        # For now, assume a single light
-        return [self.api]
+    async def get_groups(self):
+        # Fetch groups/zones from the API
+        try:
+            groups = await self.api._request("GET", "groups")
+            return groups.get("groups", []) if groups else []
+        except Exception as e:
+            _LOGGER.error(f"Error fetching Jellyfish Lighting groups: {e}")
+            return []
 
     async def close(self):
         await self.api.close()
@@ -33,18 +36,26 @@ async def async_setup_entry(hass, entry, async_add_entities):
     host = entry_data.get("host")
     api_key = entry_data.get("api_key")
     lighting = JellyfishLighting(host, api_key)
-    lights = await lighting.get_lights()
-    entities = [JellyfishLight(light_api) for light_api in lights]
+    groups = await lighting.get_groups()
+    entities = []
+    if groups:
+        for group in groups:
+            entities.append(JellyfishLight(lighting.api, group))
+    else:
+        # fallback: single light if no groups
+        entities.append(JellyfishLight(lighting.api, None))
     async_add_entities(entities)
 
 class JellyfishLight(LightEntity):
-    def __init__(self, api: JellyfishLightingAPI):
+    def __init__(self, api: JellyfishLightingAPI, group: dict = None):
         self._api = api
+        self._group = group
         self._is_on = False
         self._rgb_color = (255, 255, 255)
         self._effect = None
         self._available_effects = []
-        self._name = "Jellyfish Lighting"
+        self._name = group["name"] if group else "Jellyfish Lighting"
+        self._group_id = group["id"] if group and "id" in group else None
 
     async def async_added_to_hass(self):
         await self.async_update()
@@ -52,6 +63,10 @@ class JellyfishLight(LightEntity):
     @property
     def name(self):
         return self._name
+
+    @property
+    def unique_id(self):
+        return f"jellyfish_{self._group_id}" if self._group_id else None
 
     @property
     def is_on(self):
