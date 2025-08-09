@@ -25,8 +25,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         "entry": entry
     }
 
-    # forward platforms
-    hass.config_entries.async_setup_platforms(entry, PLATFORMS)
+    for platform in PLATFORMS:
+        hass.async_create_task(
+            hass.config_entries.async_forward_entry_setup(entry, platform)
+        )
 
     # Register services
     async def async_run_pattern(call):
@@ -52,7 +54,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     hass.services.async_register(DOMAIN, SERVICE_RUN_PATTERN_ADV, async_run_pattern_adv)
     hass.services.async_register(DOMAIN, SERVICE_GET_PATTERN_DATA, async_get_pattern_data)
 
-    # store and return
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
