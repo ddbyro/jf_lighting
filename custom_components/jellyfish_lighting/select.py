@@ -1,7 +1,7 @@
 import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from .const import DOMAIN
 from .websocket_api import JellyfishClient
 
@@ -35,10 +35,26 @@ class JellyfishPatternSelect(SelectEntity):
         self._attr_name = f"Jellyfish {zone_name} Pattern"
         self._attr_options = self._get_patterns()
         self._attr_current_option = None
+        self._unsub = None
+
+    async def async_added_to_hass(self):
+        # Listen for pattern updates
+        self._unsub = async_dispatcher_connect(
+            self.hass, f"{DOMAIN}_patterns_updated", self._handle_patterns_updated
+        )
+
+    async def async_will_remove_from_hass(self):
+        if self._unsub:
+            self._unsub()
+            self._unsub = None
 
     def _get_patterns(self):
         patterns = self._client.patterns
         return [pat.get("name", "Unknown") for pat in patterns]
+
+    def _handle_patterns_updated(self):
+        self._attr_options = self._get_patterns()
+        self.async_write_ha_state()
 
     @property
     def unique_id(self):
@@ -46,7 +62,7 @@ class JellyfishPatternSelect(SelectEntity):
 
     @property
     def options(self):
-        return self._get_patterns()
+        return self._attr_options
 
     @property
     def current_option(self):
