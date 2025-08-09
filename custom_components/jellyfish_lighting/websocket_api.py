@@ -15,7 +15,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 _LOGGER = logging.getLogger(__name__)
 
 class JellyfishClient:
-    def __init__(self, hass: HomeAssistant, host: str, port: int = 80):
+    def __init__(self, hass: HomeAssistant, host: str, port: int = 9000):
         self.hass = hass
         self.host = host
         self.port = port
@@ -41,7 +41,9 @@ class JellyfishClient:
         await self._connect_ws()
 
     async def _connect_ws(self):
-        url = f"ws://{self.host}:{self.port}/"
+        if self._session is None:
+            self._session = ClientSession()
+        url = f"ws://{self.host}:{self.port}/ws"
         try:
             _LOGGER.debug("Connecting to Jellyfish controller at %s", url)
             self._ws = await self._session.ws_connect(url, heartbeat=30)
