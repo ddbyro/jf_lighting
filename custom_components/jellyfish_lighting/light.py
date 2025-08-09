@@ -5,6 +5,7 @@ import logging
 from homeassistant.components.light import LightEntity, SUPPORT_COLOR, SUPPORT_EFFECT
 from homeassistant.const import CONF_HOST, CONF_API_KEY
 from .api import JellyfishLightingAPI
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,8 +16,9 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     async_add_entities([JellyfishLight(api)])
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    host = entry.data.get("host")
-    api_key = entry.data.get("api_key")
+    entry_data = hass.data[DOMAIN][entry.entry_id]
+    host = entry_data.get("host")
+    api_key = entry_data.get("api_key")
     api = JellyfishLightingAPI(host, api_key)
     async_add_entities([JellyfishLight(api)])
 
