@@ -91,3 +91,27 @@ class JellyfishZoneLight(LightEntity):
         await self._client.run_pattern(file=pattern, zone_names=[self._zone_name], state=1)
         self._is_on = True
         self.async_write_ha_state()
+
+    async def async_added_to_hass(self):
+        # Listen for zone updates
+        self._unsub_zone = async_dispatcher_connect(
+            self.hass, f"{DOMAIN}_zones_updated", self._handle_zone_update
+        )
+        # Listen for pattern updates
+        self._unsub_pattern = async_dispatcher_connect(
+            self.hass, f"{DOMAIN}_patterns_updated", self._handle_pattern_update
+        )
+        await self._handle_zone_update()
+        await self._handle_pattern_update()
+
+    async def async_will_remove_from_hass(self):
+        if hasattr(self, '_unsub_zone') and self._unsub_zone:
+            self._unsub_zone()
+        if hasattr(self, '_unsub_pattern') and self._unsub_pattern:
+            self._unsub_pattern()
+
+    async def _handle_zone_update(self):
+        self.async_write_ha_state()
+
+    async def _handle_pattern_update(self):
+        self.async_write_ha_state()
