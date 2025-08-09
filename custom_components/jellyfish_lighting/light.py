@@ -93,16 +93,13 @@ class JellyfishZoneLight(LightEntity):
         self.async_write_ha_state()
 
     async def async_added_to_hass(self):
-        # Listen for zone updates
+        # Listen for zone updates (status changes)
         self._unsub_zone = async_dispatcher_connect(
-            self.hass, f"{DOMAIN}_zones_updated", self._handle_zone_update
-        )
-        # Listen for pattern updates
-        self._unsub_pattern = async_dispatcher_connect(
-            self.hass, f"{DOMAIN}_patterns_updated", self._handle_pattern_update
+            self.hass, 'jellyfish_zones_updated', self._handle_zone_update
         )
         await self._handle_zone_update()
-        await self._handle_pattern_update()
+        # Add debug logging
+        _LOGGER.debug(f"JellyfishZoneLight[{self._zone_name}] subscribed to zone updates")
 
     async def async_will_remove_from_hass(self):
         if hasattr(self, '_unsub_zone') and self._unsub_zone:
@@ -111,11 +108,10 @@ class JellyfishZoneLight(LightEntity):
             self._unsub_pattern()
 
     async def _handle_zone_update(self):
-        # Update state from controller data
         zone_data = self._client.zones.get(self._zone_name)
+        _LOGGER.debug(f"JellyfishZoneLight[{self._zone_name}] zone_data: {zone_data}")
         if zone_data:
             self._is_on = zone_data.get("ledPower", self._is_on)
-            # If the controller provides the current pattern, update it here
             self._pattern = zone_data.get("currentPattern", self._pattern)
         self.async_write_ha_state()
 

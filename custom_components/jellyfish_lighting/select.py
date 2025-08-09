@@ -37,12 +37,16 @@ class JellyfishPatternSelect(SelectEntity):
         self._unsub_patterns = None
 
     async def async_added_to_hass(self):
-        self._unsub_patterns = async_dispatcher_connect(
-            self.hass, SIGNAL_PATTERNS_UPDATED, self._handle_patterns_updated
+        # Listen for zone updates (status changes)
+        self._unsub_zone = async_dispatcher_connect(
+            self.hass, 'jellyfish_zones_updated', self._handle_zone_update
         )
-        await self._handle_patterns_updated()
+        await self._handle_zone_update()
 
     async def async_will_remove_from_hass(self):
+        if hasattr(self, '_unsub_zone') and self._unsub_zone:
+            self._unsub_zone()
+            self._unsub_zone = None
         if self._unsub_patterns:
             self._unsub_patterns()
             self._unsub_patterns = None
@@ -55,6 +59,14 @@ class JellyfishPatternSelect(SelectEntity):
     async def _handle_patterns_updated(self):
         _LOGGER.debug(f"JellyfishPatternSelect[{self._zone_name}] handle_patterns_updated called")
         self._attr_options = self._get_patterns()
+        self.async_write_ha_state()
+
+    async def _handle_zone_update(self):
+        # Update state from controller data
+        zone_data = self._client.zones.get(self._zone_name)
+        if zone_data:
+            # If the controller provides the current pattern, update it here
+            self._attr_current_option = zone_data.get("currentPattern", self._attr_current_option)
         self.async_write_ha_state()
 
     @property
