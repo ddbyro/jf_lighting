@@ -55,9 +55,11 @@ class JellyfishPatternSelect(SelectEntity):
 
     def _get_patterns(self):
         patterns = self._client.patterns
+        _LOGGER.debug(f"JellyfishPatternSelect[{self._zone_name}] patterns: {patterns}")
         return [pat.get("name", "Unknown") for pat in patterns]
 
     async def _handle_patterns_updated(self):
+        _LOGGER.debug(f"JellyfishPatternSelect[{self._zone_name}] handle_patterns_updated called")
         self._attr_options = self._get_patterns()
         self.async_write_ha_state()
 
