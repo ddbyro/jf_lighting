@@ -9,11 +9,6 @@ from homeassistant.core import HomeAssistant, callback
 
 from .const import DOMAIN
 
-from homeassistant.helpers.dispatcher import async_dispatcher_send
-
-from homeassistant.helpers import entity_registry, entity_platform
-
-
 _LOGGER = logging.getLogger(__name__)
 
 class JellyfishClient:
@@ -99,12 +94,15 @@ class JellyfishClient:
 
         cmd = payload.get("cmd")
         if cmd == "fromCtlr":
+            # patternFileList
             if "patternFileList" in payload:
                 self._patterns = payload["patternFileList"]
-                async_dispatcher_send(self.hass, f"{DOMAIN}_patterns_updated")
+                # notify HA to update entities
+                self.hass.helpers.dispatcher.async_dispatcher_send(f"{DOMAIN}_patterns_updated")
             if "zones" in payload:
                 self._zones = payload["zones"]
-                async_dispatcher_send(self.hass, f"{DOMAIN}_zones_updated")
+                self.hass.helpers.dispatcher.async_dispatcher_send(f"{DOMAIN}_zones_updated")
+        # other responses can be handled similarly
 
     async def _send(self, payload: Dict[str, Any]):
         await self._connected_event.wait()

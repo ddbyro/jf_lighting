@@ -1,9 +1,10 @@
 {
-  "domain": "jellyfish_lighting",
+  "domain": "jellyfish",
   "name": "Jellyfish Lighting",
-  "version": "1.0",
-  "requirements": ["aiohttp"],
+  "version": "0.1.0",
+  "documentation": "https://github.com/your-repo",
+  "requirements": [],
   "dependencies": [],
-  "codeowners": [],
-  "iot_class": "local_push"
+  "codeowners": ["@your-github"],
+  "iot_class": "local_polling"
 }
