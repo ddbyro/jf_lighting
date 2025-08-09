@@ -1,5 +1,5 @@
 DOMAIN = "jellyfish"
-PLATFORMS = ["light", "select"]
+PLATFORMS = ["light", "select", "sensor"]
 DEFAULT_PORT = 9000
 
 CONF_HOST = "host"
