@@ -47,9 +47,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         filename = call.data.get("filename")
         return await client.get_pattern_file_data(folder, filename)
 
+    async def async_set_zone_pattern(call):
+        zone = call.data.get("zone")
+        pattern = call.data.get("pattern")
+        # Find the entity for the zone
+        for entry_id, data in hass.data[DOMAIN].items():
+            client = data["client"]
+            for zone_name in client.zones.keys():
+                if zone_name == zone:
+                    # Find the entity instance
+                    for entity in hass.data[DOMAIN][entry_id].get("entities", []):
+                        if getattr(entity, "_zone_name", None) == zone:
+                            await entity.async_set_pattern(pattern)
+                            return
+        _LOGGER.warning(f"Zone '{zone}' not found for pattern set")
+
     hass.services.async_register(DOMAIN, SERVICE_RUN_PATTERN, async_run_pattern)
     hass.services.async_register(DOMAIN, SERVICE_RUN_PATTERN_ADV, async_run_pattern_adv)
     hass.services.async_register(DOMAIN, SERVICE_GET_PATTERN_DATA, async_get_pattern_data)
+    hass.services.async_register(DOMAIN, "set_zone_pattern", async_set_zone_pattern)
 
     return True
 

@@ -13,15 +13,19 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
     client: JellyfishClient = hass.data[DOMAIN][entry.entry_id]["client"]
-    entities = []
+    entities = {}
     added_zones = set()
 
     async def add_zone_entities():
+        new_entities = []
         for zone_name in client.zones.keys():
             if zone_name not in added_zones:
-                entities.append(JellyfishZoneLight(client, zone_name))
+                entity = JellyfishZoneLight(client, zone_name)
+                entities[zone_name] = entity
+                new_entities.append(entity)
                 added_zones.add(zone_name)
-        async_add_entities(list(entities), True)
+        if new_entities:
+            async_add_entities(new_entities, True)
 
     # Subscribe to zone updates with async callback
     async_dispatcher_connect(hass, f"{DOMAIN}_zones_updated", add_zone_entities)
@@ -38,6 +42,7 @@ class JellyfishZoneLight(LightEntity):
         self._zone_name = zone_name
         self._attr_name = f"Jellyfish {zone_name}"
         self._is_on = False
+        self._pattern = None
 
     @property
     def unique_id(self):
@@ -48,6 +53,21 @@ class JellyfishZoneLight(LightEntity):
         return self._is_on
 
     @property
+    def extra_state_attributes(self):
+        # Expose available patterns and current pattern
+        patterns = self._client.patterns
+        folders = {}
+        for pat in patterns:
+            folder = pat.get("folders", "Unknown")
+            name = pat.get("name", "Unknown")
+            folders.setdefault(folder, []).append(name)
+        return {
+            "available_folders": list(folders.keys()),
+            "available_patterns": folders,
+            "current_pattern": self._pattern,
+        }
+
+    @property
     def device_info(self) -> DeviceInfo:
         return DeviceInfo(
             identifiers={(DOMAIN, "controller")},
@@ -55,11 +75,19 @@ class JellyfishZoneLight(LightEntity):
         )
 
     async def async_turn_on(self, **kwargs: Any):
-        await self._client.run_pattern(file="", zone_names=[self._zone_name], state=1)
+        # Use last selected pattern or default
+        pattern = self._pattern or ""
+        await self._client.run_pattern(file=pattern, zone_names=[self._zone_name], state=1)
         self._is_on = True
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any):
         await self._client.run_pattern(file="", zone_names=[self._zone_name], state=0)
         self._is_on = False
+        self.async_write_ha_state()
+
+    async def async_set_pattern(self, pattern: str):
+        self._pattern = pattern
+        await self._client.run_pattern(file=pattern, zone_names=[self._zone_name], state=1)
+        self._is_on = True
         self.async_write_ha_state()
