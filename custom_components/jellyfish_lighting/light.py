@@ -16,18 +16,21 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
     entities = []
     added_zones = set()
 
-    def add_zone_entities():
+    async def add_zone_entities():
         for zone_name in client.zones.keys():
             if zone_name not in added_zones:
                 entities.append(JellyfishZoneLight(client, zone_name))
                 added_zones.add(zone_name)
         async_add_entities(list(entities), True)
 
+    def schedule_add_zone_entities():
+        hass.async_create_task(add_zone_entities())
+
     # Subscribe to zone updates
-    async_dispatcher_connect(hass, f"{DOMAIN}_zones_updated", add_zone_entities)
+    async_dispatcher_connect(hass, f"{DOMAIN}_zones_updated", schedule_add_zone_entities)
     # Initial request
     await client.request_zones()
-    add_zone_entities()
+    await add_zone_entities()
 
 class JellyfishZoneLight(LightEntity):
     _attr_supported_color_modes = {COLOR_MODE_ONOFF}
