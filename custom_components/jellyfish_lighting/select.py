@@ -41,7 +41,7 @@ class JellyfishPatternSelect(SelectEntity):
     async def async_added_to_hass(self):
         # Listen for pattern updates
         self._unsub_patterns = async_dispatcher_connect(
-            self.hass, f"{DOMAIN}_patterns_updated", self._handle_patterns_updated
+            self.hass, SIGNAL_PATTERNS_UPDATED, self._handle_patterns_updated
         )
         await self._handle_patterns_updated()
 
