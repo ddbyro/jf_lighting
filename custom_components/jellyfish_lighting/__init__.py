@@ -19,3 +19,13 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     _LOGGER.info("Setting up Jellyfish Lighting integration")
     return True
 
+async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
+    """
+    Set up Jellyfish Lighting from a config entry (UI wizard).
+    """
+    hass.async_create_task(
+        hass.helpers.discovery.async_load_platform(
+            "light", DOMAIN, entry.data, entry
+        )
+    )
+    return True

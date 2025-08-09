@@ -14,6 +14,12 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     api = JellyfishLightingAPI(host, api_key)
     async_add_entities([JellyfishLight(api)])
 
+async def async_setup_entry(hass, entry, async_add_entities):
+    host = entry.data.get("host")
+    api_key = entry.data.get("api_key")
+    api = JellyfishLightingAPI(host, api_key)
+    async_add_entities([JellyfishLight(api)])
+
 class JellyfishLight(LightEntity):
     def __init__(self, api: JellyfishLightingAPI):
         self._api = api
@@ -78,4 +84,3 @@ class JellyfishLight(LightEntity):
         effects = await self._api.get_effects()
         if effects:
             self._available_effects = effects.get("effects", [])
-

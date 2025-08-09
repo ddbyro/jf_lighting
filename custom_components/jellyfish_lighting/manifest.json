@@ -4,6 +4,6 @@
   "documentation": "https://github.com/parkerjfl/JellyfishLightingAPIExplorer/blob/main/Jellyfish%20Lighting%20API%20Documentation%20(1).pdf",
   "requirements": [],
   "dependencies": [],
-  "codeowners": ["@your-github-username"]
+  "codeowners": ["@your-github-username"],
+  "config_flow": true
 }
-
