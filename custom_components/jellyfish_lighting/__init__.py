@@ -21,13 +21,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
     try:
-        # Try to forward config entry to the light platform (modern HA)
-        forward = getattr(hass, "async_forward_entry_setup", None)
-        if forward:
-            await forward(entry, "light")
-        else:
-            # Fallback: store config entry data for platform setup
-            hass.data.setdefault(DOMAIN, {})[entry.entry_id] = entry.data
+        # Correct forwarding for config entry setup
+        await hass.config_entries.async_forward_entry_setup(entry, "light")
         return True
     except Exception as e:
         _LOGGER.error(f"Error setting up Jellyfish Lighting entry: {e}")
