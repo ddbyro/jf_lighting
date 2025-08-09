@@ -36,13 +36,18 @@ class JellyfishLightingAPI:
         return resp["patternFileList"] if resp and "patternFileList" in resp else []
 
     def get_groups(self):
-        # Groups/zones are typically in the config or pattern response
+        # Build a list of dicts with group name and id (if available)
         patterns = self.get_patterns()
-        groups = set()
+        groups = {}
         for pattern in patterns:
-            if "folders" in pattern:
-                groups.add(pattern["folders"])
-        return list(groups)
+            folder = pattern.get("folders")
+            if folder:
+                if folder not in groups:
+                    groups[folder] = {"name": folder, "patterns": []}
+                groups[folder]["patterns"].append(pattern["name"])
+        # Log discovered groups for debugging
+        _LOGGER.info(f"Discovered Jellyfish Lighting groups: {list(groups.values())}")
+        return list(groups.values())
 
     def set_power(self, state: int, zone_name=None):
         payload = {

@@ -41,15 +41,15 @@ async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities(entities)
 
 class JellyfishLight(LightEntity):
-    def __init__(self, api: JellyfishLightingAPI, group: str = None):
+    def __init__(self, api: JellyfishLightingAPI, group: dict = None):
         self._api = api
         self._group = group
         self._is_on = False
         self._rgb_color = (255, 255, 255)
         self._effect = None
-        self._available_effects = []
-        self._name = group if group else "Jellyfish Lighting"
-        self._group_id = group if group else None
+        self._available_effects = group["patterns"] if group else []
+        self._name = group["name"] if group else "Jellyfish Lighting"
+        self._group_id = group["name"] if group else None
 
     async def async_added_to_hass(self):
         await self.async_update()
@@ -112,8 +112,11 @@ class JellyfishLight(LightEntity):
             zone_name = self._group_id
             power = self._api.get_state()
             self._is_on = power == True
-            patterns = self._api.get_patterns()
-            self._available_effects = [p["name"] for p in patterns if p.get("folders") == zone_name] if zone_name else [p["name"] for p in patterns]
-            # No direct color support in API, so leave as last set
+            # Only show patterns for this group
+            if self._group:
+                self._available_effects = self._group["patterns"]
+            else:
+                patterns = self._api.get_patterns()
+                self._available_effects = [p["name"] for p in patterns]
         except Exception as e:
             _LOGGER.error(f"Error updating Jellyfish Lighting: {e}")
