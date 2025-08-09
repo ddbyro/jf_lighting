@@ -41,7 +41,12 @@ class JellyfishPatternSelect(SelectEntity):
         self._unsub_zone = async_dispatcher_connect(
             self.hass, 'jellyfish_zones_updated', self._handle_zone_update
         )
+        # Listen for pattern updates (options changes)
+        self._unsub_patterns = async_dispatcher_connect(
+            self.hass, SIGNAL_PATTERNS_UPDATED, self._handle_patterns_updated
+        )
         await self._handle_zone_update()
+        await self._handle_patterns_updated()
 
     async def async_will_remove_from_hass(self):
         if hasattr(self, '_unsub_zone') and self._unsub_zone:
@@ -52,9 +57,9 @@ class JellyfishPatternSelect(SelectEntity):
             self._unsub_patterns = None
 
     def _get_patterns(self):
-        patterns = self._client.patterns
+        patterns = self._client.patterns or []
         _LOGGER.debug(f"JellyfishPatternSelect[{self._zone_name}] patterns: {patterns}")
-        return [pat.get("name", "Unknown") for pat in patterns]
+        return [pat.get("name", "Unknown") for pat in patterns] if patterns else []
 
     async def _handle_patterns_updated(self):
         _LOGGER.debug(f"JellyfishPatternSelect[{self._zone_name}] handle_patterns_updated called")
@@ -75,7 +80,7 @@ class JellyfishPatternSelect(SelectEntity):
 
     @property
     def options(self):
-        return self._attr_options
+        return self._attr_options or []
 
     @property
     def current_option(self):
