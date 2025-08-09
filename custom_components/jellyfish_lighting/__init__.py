@@ -23,5 +23,5 @@ async def async_setup_entry(hass: HomeAssistant, entry) -> bool:
     """
     Store config entry data for platform setup.
     """
-    await hass.async_forward_entry_setup(entry, "light")
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = entry.data
     return True
